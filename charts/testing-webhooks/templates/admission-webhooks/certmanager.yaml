@@ -1,0 +1,29 @@
+{{- if and .Values.admissionWebhooks.certManager.enabled -}}
+# The following manifests contain a self-signed issuer CR and a certificate CR.
+# More document can be found at https://docs.cert-manager.io
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "testing-webhooks.fullname" . }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+
+---
+# Generate a CA Certificate used to sign certificates for the webhook
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "testing-webhooks.fullname" . }}-serving-cert
+  namespace: {{ .Release.Namespace }}
+spec:
+  dnsNames:
+  - {{ template "testing-webhooks.name" . }}-webhook.{{ .Release.Namespace }}.svc
+  - {{ template "testing-webhooks.name" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+  secretName: {{ template "testing-webhooks.admissionWebhookSecret" . }}
+  duration: 43800h # 5y
+  revisionHistoryLimit: {{ .Values.admissionWebhooks.certManager.revisionHistoryLimit }}
+  issuerRef:
+    kind: Issuer
+    name: {{ template "testing-webhooks.fullname" . }}-selfsigned-issuer
+{{- end }}

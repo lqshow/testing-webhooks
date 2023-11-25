@@ -1,0 +1,36 @@
+{{- if .Values.admissionWebhooks.enabled -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ template "testing-webhooks.fullname" . }}-validating-webhook-config
+  {{- if .Values.admissionWebhooks.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-serving-cert" .Release.Namespace (include "testing-webhooks.fullname" .) | quote }}
+  {{- end }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "testing-webhooks.name" . }}-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /validate-webapp-foobar-ai-v1-guestbook
+  {{- if .Values.admissionWebhooks.patch.enabled  }}
+  failurePolicy: Ignore
+  {{- else }}
+  failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
+  {{- end }}
+  name: vguestbook.kb.io
+  rules:
+  - apiGroups:
+    - webapp.foobar.ai
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - guestbooks
+  sideEffects: None
+{{- end -}}

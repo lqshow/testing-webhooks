@@ -1,0 +1,33 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "testing-webhooks.fullname" . }}:manager
+  labels:
+    {{- include "testing-webhooks.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - webapp.foobar.ai
+  resources:
+  - guestbooks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - webapp.foobar.ai
+  resources:
+  - guestbooks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - webapp.foobar.ai
+  resources:
+  - guestbooks/status
+  verbs:
+  - get
+  - patch
+  - update

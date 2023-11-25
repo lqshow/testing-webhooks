@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "testing-webhooks.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "testing-webhooks.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "testing-webhooks.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.podAnnotations }}
+{{ toYaml .Values.podAnnotations | indent 8 }}
+        {{- end }}
+      labels:
+        {{- include "testing-webhooks.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "testing-webhooks.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:{{ .Values.healthCheck.port }}
+            {{ if .Values.admissionWebhooks.enabled }}
+            - "--webhook-port={{ .Values.webhookService.port }}"
+            - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
+            {{ end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{ if .Values.admissionWebhooks.enabled }}
+          ports:
+            - containerPort: {{ .Values.webhookService.port }}
+              name: webhook-server
+              protocol: TCP
+            - containerPort: {{ .Values.healthCheck.port }}
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          {{ end }}
+          volumeMounts:
+          {{ if .Values.admissionWebhooks.enabled }}
+          - mountPath: {{ .Values.admissionWebhooks.certificate.mountPath }}
+            name: cert
+            readOnly: true
+          {{ end }}
+      volumes:
+      {{ if .Values.admissionWebhooks.enabled }}
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: {{ template "testing-webhooks.admissionWebhookSecret" . }}
+      {{ end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
